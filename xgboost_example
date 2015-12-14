@@ -1,0 +1,80 @@
+# This is a example for xgboost
+# time updated: 2015-12-14
+install.packages('dplyr')  # data manipulation
+install.packages('xgboost')  # calling xgboost model
+install.packages('data.table') # another version of data frame
+install.packages('caret') # machine learning package, could do data validation
+install.packages('lubridate')
+
+require(dplyr)
+require(xgboost)
+require(data.table)
+require(caret)
+require(lubridate)
+
+# loading agaricus data
+data(agaricus.train, package='xgboost') 
+data(agaricus.test, package='xgboost')
+train <- agaricus.train  # a list of data
+test <- agaricus.test
+
+# dimemsion of data
+dim(train$data)
+dim(test$data)
+
+# data class
+class(train$data)[1]  # dgCMatrix is a sparse matrix
+			# In sparse matrix, cells containing 0 are not stored 
+			# in memory
+class(train$label)
+
+# basic training
+# 1. objective = "binary:logistic": 
+	# we will train a binary classification model ;
+# 2. max.deph = 2: 
+	# the trees won't be deep, because our case is very simple ;
+# 3. nthread = 2: 
+	# the number of cpu threads we are going to use;
+# 4. nround = 2: 
+	# there will be two passes on the data, 
+	# the second one will enhance the model by further reducing the difference between ground truth and prediction.
+
+bstSparse <- xgboost(data = train$data, label = train$label, 
+				max.depth = 2, eta = 1, nthread = 2, nround = 2,
+				objective = "binary:logistic") 
+
+# switch dgCmatrix to dense matrix
+x <- as.matrix(train$data)
+bstDense <- xgboost(data = as.matrix(train$data), label = train$label, 
+				max.depth = 2, eta = 1, nthread = 2, nround = 2,
+				objective = "binary:logistic") 
+
+# xgb.DMatrix 
+dtrain <- xgb.DMatrix(data = train$data, label = train$label)
+
+# see the training progress, verbose = 0 --> no message
+bstDMatrix <- xgboost(data = dtrain, 
+				max.depth = 2, eta = 1, nthread = 2, nround = 2,
+				objective = "binary:logistic", verbose = 0 )
+
+# verbose =1 , print evaluation metric  
+bstDMatrix <- xgboost(data = dtrain, 
+				max.depth = 2, eta = 1, nthread = 2, nround = 2,
+				objective = "binary:logistic", verbose = 1 )  
+
+
+# verbose = 2 , print information about the tree 
+bst <- xgboost(data = dtrain, 
+				max.depth = 2, eta = 1, nthread = 2, nround = 2,
+				objective = "binary:logistic", verbose = 2 )  
+
+
+## prediction 
+pred <- predict(bst, test$data)
+
+prediction <- as.numeric(pred > 0.5) # observation can be classified as 1 when probability > 0.5
+
+## measure model performance
+# calculate error
+err <- mean(as.numeric(pred > 0.5) != test$label)
+print(paste0("test-error = ", err))
